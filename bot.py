@@ -13,20 +13,31 @@ handler = WebhookHandler('e5d464aa428fdb58ede0e1a877108551')
 def hello():
     return "Hello World!"
 
-@app.route("/webhook", methods=['POST'])
-def webhook():
-    # get X-Line-Signature header value
+@app.route("/callback", methods=['POST'])
+def callback():
     signature = request.headers['X-Line-Signature']
 
     # get request body as text
     body = request.get_data(as_text=True)
     app.logger.info("Request body: " + body)
 
-    # handle webhook body
+    # parse webhook body
     try:
-        handler.handle(body, signature)
+        events = parser.parse(body, signature)
     except InvalidSignatureError:
         abort(400)
+
+    # if event is MessageEvent and message is TextMessage, then echo text
+    for event in events:
+        if not isinstance(event, MessageEvent):
+            continue
+        if not isinstance(event.message, TextMessage):
+            continue
+
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text=event.message.text)
+        )
 
     return 'OK'
     
